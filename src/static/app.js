@@ -135,26 +135,107 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("click", async (event) => {
     if (event.target.classList.contains("view-participants-btn")) {
       const activityName = event.target.getAttribute("data-activity");
-      
-      try {
-        const response = await fetch(`/activities/${encodeURIComponent(activityName)}/participants`);
-        const result = await response.json();
-        
-        if (response.ok) {
-          const participantsList = result.participants.length > 0 
-            ? result.participants.join(", ") 
-            : "No participants yet";
-            
-          alert(`${activityName} Participants:\n\n${participantsList}\n\nTotal: ${result.total_participants}/${result.total_participants + result.available_spots}`);
-        } else {
-          alert("Failed to load participants");
-        }
-      } catch (error) {
-        alert("Error loading participants");
-        console.error("Error fetching participants:", error);
-      }
+      await showParticipantsModal(activityName);
+    }
+    
+    // Handle delete participant button clicks
+    if (event.target.classList.contains("delete-participant-btn")) {
+      const email = event.target.getAttribute("data-email");
+      const activityName = event.target.getAttribute("data-activity");
+      await removeParticipant(email, activityName);
+    }
+    
+    // Handle modal close
+    if (event.target.classList.contains("close-modal") || event.target.classList.contains("modal-overlay")) {
+      closeParticipantsModal();
     }
   });
+
+  async function showParticipantsModal(activityName) {
+    try {
+      const response = await fetch(`/activities/${encodeURIComponent(activityName)}/participants`);
+      const result = await response.json();
+      
+      if (response.ok) {
+        const modal = createParticipantsModal(activityName, result);
+        document.body.appendChild(modal);
+      } else {
+        alert("Failed to load participants");
+      }
+    } catch (error) {
+      alert("Error loading participants");
+      console.error("Error fetching participants:", error);
+    }
+  }
+
+  function createParticipantsModal(activityName, data) {
+    const modal = document.createElement("div");
+    modal.className = "modal-overlay";
+    modal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>${activityName} Participants</h3>
+          <span class="close-modal">&times;</span>
+        </div>
+        <div class="modal-body">
+          <p><strong>Total:</strong> ${data.total_participants}/${data.total_participants + data.available_spots}</p>
+          <div class="participants-list">
+            ${data.participants.length > 0 
+              ? data.participants.map(email => `
+                  <div class="participant-item">
+                    <span class="participant-email">${email}</span>
+                    <button class="delete-participant-btn" data-email="${email}" data-activity="${activityName}">
+                      🗑️
+                    </button>
+                  </div>
+                `).join('')
+              : '<p class="no-participants">No participants yet</p>'
+            }
+          </div>
+        </div>
+      </div>
+    `;
+    return modal;
+  }
+
+  async function removeParticipant(email, activityName) {
+    if (!confirm(`Are you sure you want to remove ${email} from ${activityName}?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/activities/${encodeURIComponent(activityName)}/cancel?email=${encodeURIComponent(email)}`,
+        { method: "DELETE" }
+      );
+
+      const result = await response.json();
+
+      if (response.ok) {
+        // Close modal and refresh activities
+        closeParticipantsModal();
+        fetchActivities();
+        
+        // Show success message
+        messageDiv.textContent = result.message;
+        messageDiv.className = "success";
+        messageDiv.classList.remove("hidden");
+        setTimeout(() => messageDiv.classList.add("hidden"), 3000);
+      } else {
+        alert(result.detail || "Failed to remove participant");
+      }
+    } catch (error) {
+      alert("Error removing participant");
+      console.error("Error removing participant:", error);
+    }
+  }
+
+  function closeParticipantsModal() {
+    const modal = document.querySelector(".modal-overlay");
+    if (modal) {
+      modal.remove();
+    }
+  }
 
   // Initialize app
   fetchActivities();
