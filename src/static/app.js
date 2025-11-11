@@ -1,8 +1,11 @@
 document.addEventListener("DOMContentLoaded", () => {
   const activitiesList = document.getElementById("activities-list");
   const activitySelect = document.getElementById("activity");
+  const cancelActivitySelect = document.getElementById("cancel-activity");
   const signupForm = document.getElementById("signup-form");
+  const cancelForm = document.getElementById("cancel-form");
   const messageDiv = document.getElementById("message");
+  const cancelMessageDiv = document.getElementById("cancel-message");
 
   // Function to fetch activities from API
   async function fetchActivities() {
@@ -24,16 +27,22 @@ document.addEventListener("DOMContentLoaded", () => {
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
-          <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <p><strong>Availability:</strong> ${spotsLeft} spots left (${details.participants.length}/${details.max_participants})</p>
+          <button class="view-participants-btn" data-activity="${name}">View Participants</button>
         `;
 
         activitiesList.appendChild(activityCard);
 
-        // Add option to select dropdown
-        const option = document.createElement("option");
-        option.value = name;
-        option.textContent = name;
-        activitySelect.appendChild(option);
+        // Add option to select dropdowns
+        const signupOption = document.createElement("option");
+        signupOption.value = name;
+        signupOption.textContent = name;
+        activitySelect.appendChild(signupOption);
+
+        const cancelOption = document.createElement("option");
+        cancelOption.value = name;
+        cancelOption.textContent = name;
+        cancelActivitySelect.appendChild(cancelOption);
       });
     } catch (error) {
       activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
@@ -80,6 +89,153 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Error signing up:", error);
     }
   });
+
+  // Handle cancel form submission
+  cancelForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const email = document.getElementById("cancel-email").value;
+    const activity = document.getElementById("cancel-activity").value;
+
+    try {
+      const response = await fetch(
+        `/activities/${encodeURIComponent(activity)}/cancel?email=${encodeURIComponent(email)}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const result = await response.json();
+
+      if (response.ok) {
+        cancelMessageDiv.textContent = result.message;
+        cancelMessageDiv.className = "success";
+        cancelForm.reset();
+        fetchActivities(); // Refresh the activities list
+      } else {
+        cancelMessageDiv.textContent = result.detail || "An error occurred";
+        cancelMessageDiv.className = "error";
+      }
+
+      cancelMessageDiv.classList.remove("hidden");
+
+      // Hide message after 5 seconds
+      setTimeout(() => {
+        cancelMessageDiv.classList.add("hidden");
+      }, 5000);
+    } catch (error) {
+      cancelMessageDiv.textContent = "Failed to cancel registration. Please try again.";
+      cancelMessageDiv.className = "error";
+      cancelMessageDiv.classList.remove("hidden");
+      console.error("Error cancelling registration:", error);
+    }
+  });
+
+  // Handle view participants button clicks
+  document.addEventListener("click", async (event) => {
+    if (event.target.classList.contains("view-participants-btn")) {
+      const activityName = event.target.getAttribute("data-activity");
+      await showParticipantsModal(activityName);
+    }
+    
+    // Handle delete participant button clicks
+    if (event.target.classList.contains("delete-participant-btn")) {
+      const email = event.target.getAttribute("data-email");
+      const activityName = event.target.getAttribute("data-activity");
+      await removeParticipant(email, activityName);
+    }
+    
+    // Handle modal close
+    if (event.target.classList.contains("close-modal") || event.target.classList.contains("modal-overlay")) {
+      closeParticipantsModal();
+    }
+  });
+
+  async function showParticipantsModal(activityName) {
+    try {
+      const response = await fetch(`/activities/${encodeURIComponent(activityName)}/participants`);
+      const result = await response.json();
+      
+      if (response.ok) {
+        const modal = createParticipantsModal(activityName, result);
+        document.body.appendChild(modal);
+      } else {
+        alert("Failed to load participants");
+      }
+    } catch (error) {
+      alert("Error loading participants");
+      console.error("Error fetching participants:", error);
+    }
+  }
+
+  function createParticipantsModal(activityName, data) {
+    const modal = document.createElement("div");
+    modal.className = "modal-overlay";
+    modal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>${activityName} Participants</h3>
+          <span class="close-modal">&times;</span>
+        </div>
+        <div class="modal-body">
+          <p><strong>Total:</strong> ${data.total_participants}/${data.total_participants + data.available_spots}</p>
+          <div class="participants-list">
+            ${data.participants.length > 0 
+              ? data.participants.map(email => `
+                  <div class="participant-item">
+                    <span class="participant-email">${email}</span>
+                    <button class="delete-participant-btn" data-email="${email}" data-activity="${activityName}">
+                      🗑️
+                    </button>
+                  </div>
+                `).join('')
+              : '<p class="no-participants">No participants yet</p>'
+            }
+          </div>
+        </div>
+      </div>
+    `;
+    return modal;
+  }
+
+  async function removeParticipant(email, activityName) {
+    if (!confirm(`Are you sure you want to remove ${email} from ${activityName}?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `/activities/${encodeURIComponent(activityName)}/cancel?email=${encodeURIComponent(email)}`,
+        { method: "DELETE" }
+      );
+
+      const result = await response.json();
+
+      if (response.ok) {
+        // Close modal and refresh activities
+        closeParticipantsModal();
+        fetchActivities();
+        
+        // Show success message
+        messageDiv.textContent = result.message;
+        messageDiv.className = "success";
+        messageDiv.classList.remove("hidden");
+        setTimeout(() => messageDiv.classList.add("hidden"), 3000);
+      } else {
+        alert(result.detail || "Failed to remove participant");
+      }
+    } catch (error) {
+      alert("Error removing participant");
+      console.error("Error removing participant:", error);
+    }
+  }
+
+  function closeParticipantsModal() {
+    const modal = document.querySelector(".modal-overlay");
+    if (modal) {
+      modal.remove();
+    }
+  }
 
   // Initialize app
   fetchActivities();

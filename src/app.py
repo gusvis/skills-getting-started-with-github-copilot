@@ -38,6 +38,45 @@ activities = {
         "schedule": "Mondays, Wednesdays, Fridays, 2:00 PM - 3:00 PM",
         "max_participants": 30,
         "participants": ["john@mergington.edu", "olivia@mergington.edu"]
+    },
+    # Sports
+    "Soccer Team": {
+        "description": "Join the school soccer team and compete in local tournaments",
+        "schedule": "Wednesdays, 4:00 PM - 6:00 PM",
+        "max_participants": 22,
+        "participants": []
+    },
+    "Basketball Club": {
+        "description": "Practice basketball skills and play friendly matches",
+        "schedule": "Mondays, 3:30 PM - 5:00 PM",
+        "max_participants": 15,
+        "participants": []
+    },
+    # Arts
+    "Drama Club": {
+        "description": "Participate in theater productions and acting workshops",
+        "schedule": "Thursdays, 4:00 PM - 5:30 PM",
+        "max_participants": 18,
+        "participants": []
+    },
+    "Art Workshop": {
+        "description": "Explore painting, drawing, and sculpture techniques",
+        "schedule": "Tuesdays, 3:30 PM - 5:00 PM",
+        "max_participants": 16,
+        "participants": []
+    },
+    # Academic
+    "Math Olympiad": {
+        "description": "Prepare for math competitions and solve challenging problems",
+        "schedule": "Fridays, 2:00 PM - 3:30 PM",
+        "max_participants": 10,
+        "participants": []
+    },
+    "Debate Team": {
+        "description": "Develop public speaking and argumentation skills",
+        "schedule": "Wednesdays, 3:30 PM - 5:00 PM",
+        "max_participants": 12,
+        "participants": []
     }
 }
 
@@ -61,7 +100,54 @@ def signup_for_activity(activity_name: str, email: str):
 
     # Get the specific activity
     activity = activities[activity_name]
+    
+    # Validate if student is already signed up
+    if email in activity["participants"]:
+        raise HTTPException(status_code=400, detail="Student already signed up for this activity")
+    
+    # Validate if activity is full
+    if len(activity["participants"]) >= activity["max_participants"]:
+        raise HTTPException(status_code=400, detail="Activity is full. No more spots available")
+    
+    # Validate email format (must be from mergington.edu domain)
+    if not email.endswith("@mergington.edu"):
+        raise HTTPException(status_code=400, detail="Only Mergington High School students can sign up")
 
     # Add student
     activity["participants"].append(email)
     return {"message": f"Signed up {email} for {activity_name}"}
+
+
+@app.delete("/activities/{activity_name}/cancel")
+def cancel_activity_signup(activity_name: str, email: str):
+    """Cancel a student's signup for an activity"""
+    # Validate activity exists
+    if activity_name not in activities:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    
+    # Get the specific activity
+    activity = activities[activity_name]
+    
+    # Check if student is signed up
+    if email not in activity["participants"]:
+        raise HTTPException(status_code=400, detail="Student is not signed up for this activity")
+    
+    # Remove student
+    activity["participants"].remove(email)
+    return {"message": f"Cancelled {email}'s signup for {activity_name}"}
+
+
+@app.get("/activities/{activity_name}/participants")
+def get_activity_participants(activity_name: str):
+    """Get list of participants for a specific activity"""
+    # Validate activity exists
+    if activity_name not in activities:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    
+    activity = activities[activity_name]
+    return {
+        "activity_name": activity_name,
+        "participants": activity["participants"],
+        "total_participants": len(activity["participants"]),
+        "available_spots": activity["max_participants"] - len(activity["participants"])
+    }

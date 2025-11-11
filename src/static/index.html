@@ -39,6 +39,25 @@
         </form>
         <div id="message" class="hidden"></div>
       </section>
+
+      <section id="cancel-container">
+        <h3>Cancel Activity Registration</h3>
+        <form id="cancel-form">
+          <div class="form-group">
+            <label for="cancel-email">Student Email:</label>
+            <input type="email" id="cancel-email" required placeholder="your-email@mergington.edu" />
+          </div>
+          <div class="form-group">
+            <label for="cancel-activity">Select Activity:</label>
+            <select id="cancel-activity" required>
+              <option value="">-- Select an activity --</option>
+              <!-- Activity options will be loaded here -->
+            </select>
+          </div>
+          <button type="submit">Cancel Registration</button>
+        </form>
+        <div id="cancel-message" class="hidden"></div>
+      </section>
     </main>
 
     <footer>
